@@ -31,7 +31,8 @@ Retail data is spread across disconnected sources, creating data silos. Traditio
 - Delta Lake
 - Unity Catalog Metric Views (YAML semantic layer)
 - Databricks AI/BI Dashboards and Databricks Genie (AI natural-language interface)
-- Sources: PostgreSQL, Salesforce, CSV files in cloud storage
+- Databricks Jobs for orchestration
+- Sources: PostgreSQL (hosted on Neon), Salesforce, CSV files in cloud storage
 
 ## Dataset
 - Source: fully **synthetic** retail data (Indian retail market: electronics,
@@ -40,8 +41,8 @@ Retail data is spread across disconnected sources, creating data silos. Traditio
 
 | Source | Data | Rows |
 |--------|------|------|
-| PostgreSQL | `product_catalog` | 20 products (+ 4 invalid test rows) |
-| PostgreSQL | `inventory` | 40 stock records (+ 4 invalid test rows) |
+| PostgreSQL (Neon) | `product_catalog` | 20 products (+ 4 invalid test rows) |
+| PostgreSQL (Neon) | `inventory` | 40 stock records (+ 4 invalid test rows) |
 | Salesforce | Accounts (customers) | 50 |
 | Salesforce | Opportunities (orders) | 100 |
 | Blob / CSV | Transactions, history load | 1,000 |
@@ -54,7 +55,8 @@ Retail data is spread across disconnected sources, creating data silos. Traditio
 
 ## Process
 1. **Source setup** – product and inventory history is created in
-   PostgreSQL (`01`, `02` SQL scripts). Accounts and opportunities are
+   a serverless PostgreSQL database on **Neon** (`01`, `02` SQL
+   scripts). Accounts and opportunities are
    seeded into Salesforce from CSV exports. Transactions are delivered as
    CSV files to a Unity Catalog Volume.
 2. **Bronze ingestion** – PostgreSQL and Salesforce data land in
@@ -90,6 +92,10 @@ Retail data is spread across disconnected sources, creating data silos. Traditio
    state, country, customer type, sales channel, payment mode and
    opportunity stage). Databricks Genie provides a natural-language
    interface for self-service questions.
+8. **Orchestration (Databricks Jobs)** – the ingestion notebook, the
+   declarative pipeline and the gold, calendar and metric view notebooks
+   are chained in a Databricks Job, so the whole flow runs from bronze to
+   semantic layer as one orchestrated, monitored run.
 
 ## Results
 The pipeline turns three disconnected sources into a single governed
@@ -119,17 +125,14 @@ and any other consumer show the same numbers.
 
 
 
-
-
-
-
 ## How to run
 Prerequisites: a Databricks workspace with Unity Catalog enabled.
 
 1. Create the catalog `retail_q` with schemas `volumes`, `blob_bronze`,
    `postgres_bronze`, `salesforce_bronze`, `retail_silver`, `retail_gold`
    and `retail_semantic`, plus a Volume `retail_q.volumes.blob_source`.
-2. Create the PostgreSQL source tables by running
+2. Create a PostgreSQL database on [Neon](https://neon.tech) and create
+   the source tables by running
    `source_data/01_postgres_product_history.sql` and
    `source_data/02_postgres_inventory_history.sql`.
 3. Import the Salesforce CSVs (`03_...accounts`, `04_...opportunities`)
@@ -236,6 +239,8 @@ demonstration. In a production setting, the next priorities would be:
   discarded.
 - **Streaming ingestion** – replace the `availableNow` batch trigger with
   continuous Auto Loader for near-real-time transactions.
+- **Alerting** – add failure notifications to the Databricks Job and
+  expectation-based alerts.
 - **Surrogate keys and SCD in gold** – the dimensions keep only the
   current record; adding history to the gold layer would allow
   point-in-time reporting.
